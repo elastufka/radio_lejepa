@@ -1,7 +1,7 @@
 model: efficientnet_b0 #convnext_tiny #yolov8n.pt #EUPE-ViT-T # #vit_tiny_patch16_224
 dataset: RGZ20k
-save_dir: /home/users/l/lastufka/scratch/lejepa/efficientnet_rgz20k
-checkpoint: /home/users/l/lastufka/scratch/lejepa/efficientnet_rgz20k/checkpoint_18.pt
+save_dir: ~/scratch/lejepa/efficientnet_rgz20k
+checkpoint: ~/efficientnet_rgz20k/checkpoint_18.pt
 run_name: efficientnet_rgz20k
 bs: 16
 epochs: 100
@@ -13,4 +13,3 @@ V: 2
 V_local: 8
 seed: 14
 imsize: 224
-yolo_spatial: false
