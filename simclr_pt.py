@@ -10,9 +10,7 @@ import yaml
 import sys
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-sys.path.append('/home/users/l/lastufka')
-# import from sthalles repo
-#from SimCLR.models.resnet_simclr import ResNetSimCLR  # we will replace backbone
+
 from SimCLR.simclr import SimCLR
 from feuerzeug.models import print_trainable_parameters
 from feuerzeug.datasets.COCODataset import RGZimageDatasetClassification
@@ -97,9 +95,6 @@ def get_simclr_augmentation(image_size=224, fake_3chan = False):
     
     return T.Compose(tlist)
 
-# -----------------------------
-# Dataset wrapper for SimCLR
-# -----------------------------
 class SimCLRDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, transform):
         self.dataset = dataset
@@ -115,16 +110,13 @@ class SimCLRDataset(torch.utils.data.Dataset):
         return len(self.dataset)
 
 
-# -----------------------------
-# ViT backbone wrapper
-# -----------------------------
 class ViTBackbone(nn.Module):
     def __init__(self, model_name="vit_tiny_patch16_224"):
         super().__init__()
         if "EUPE" in model_name:
             model_size = args.model_name[-1].lower()
             self.model = torch.hub.load(
-            "/home/users/l/lastufka/EUPE",f"eupe_vit{model_size}16",source='local',weights=f"/home/users/l/lastufka/EUPE/EUPE-ViT-{model_size.upper()}.pt")
+            "~/EUPE",f"eupe_vit{model_size}16",source='local',weights=f"~/EUPE/EUPE-ViT-{model_size.upper()}.pt")
         else:
             self.model = timm.create_model(model_name, pretrained=False)
 
@@ -143,9 +135,6 @@ class ViTBackbone(nn.Module):
         return self.model(x)
 
 
-# -----------------------------
-# SimCLR Model
-# -----------------------------
 class SimCLRWithWandb(SimCLR):
     def train(self, train_loader, val_loader=None):
         scaler = torch.cuda.amp.GradScaler(enabled=self.args.fp16_precision)
@@ -218,9 +207,7 @@ def validation_loss(simclr_model, val_loader, device):
     simclr_model.model.train()
     return total_loss / n
 
-# -----------------------------
-# Train loop
-# -----------------------------
+
 def train(args):
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
     args.n_views=2
@@ -234,7 +221,7 @@ def train(args):
         test_ds = RGZimageDatasetClassification(None, None, train=False)
         val_transform = transform
     elif args.dataset == "RGZ20k":
-        ds = RGZ20k(root = "/home/users/l/lastufka/scratch/rgz", train=True) 
+        ds = RGZ20k(root = "~/scratch/rgz", train=True) 
         test_ds = RGZimageDatasetClassification(None, None, train=False)
         val_transform = get_simclr_augmentation(args.image_size)
 
@@ -261,7 +248,6 @@ def train(args):
         log_dir = args.output_dir
     )
 
-    #criterion = NTXentLoss(temperature=args.temperature)
     optimizer = torch.optim.AdamW(model.model.parameters(),lr=args.lr,weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=args.epochs)
 
@@ -273,9 +259,6 @@ def train(args):
         torch.save(model.model.state_dict(),f"{args.output_dir}/simclr_vit.pt")
 
 
-# -----------------------------
-# CLI
-# -----------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 

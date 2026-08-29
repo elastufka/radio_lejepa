@@ -1,11 +1,7 @@
-# X = embeddings from source domain (N x D)
-# Y = embeddings from target domain (M x D)
-
 import torch
 import numpy as np
 import sys
-from PIL import Image
-sys.path.append("/home/users/l/lastufka")
+
 from feuerzeug.hf_utils import extract_features, get_dataset
 from feuerzeug.plotting import plot_dataset_sample
 from FM_compare.finetune import get_model
@@ -22,26 +18,16 @@ def compute_mmd(X, Y):
     GPU accelerated MMD.
     torchmetrics uses an RBF kernel by default.
     """
-
-    return mmd_rbf(
-        X,
-        Y
-    )
+    return mmd_rbf(X,Y)
 
 @torch.no_grad()
 def compute_stats(features):
     """
     Mean and covariance of embeddings.
     """
-
     mu = features.mean(dim=0)
-
     centered = features - mu
-
-    cov = (
-        centered.T @ centered
-    ) / (features.shape[0] - 1)
-
+    cov = (centered.T @ centered) / (features.shape[0] - 1)
     return mu, cov
 
 
@@ -49,7 +35,6 @@ def compute_stats(features):
 def compute_fid(X, Y, eps=1e-6):
     """
     Feature-space Fréchet distance.
-
     X, Y:
         [N,D] and [M,D] embeddings
     """
@@ -81,21 +66,11 @@ def compute_fid(X, Y, eps=1e-6):
             (sigma2_np + offset)
         )
 
-    covmean = torch.tensor(
-        covmean.real,
-        device=device,
-        dtype=torch.float32
-    )
+    covmean = torch.tensor(covmean.real,device=device,dtype=torch.float32)
 
-    fid = (
-        diff @ diff
+    fid = (diff @ diff
         +
-        torch.trace(
-            sigma1
-            + sigma2
-            - 2 * covmean
-        )
-    )
+        torch.trace(sigma1+ sigma2- 2 * covmean))
 
     return fid
 
@@ -113,9 +88,6 @@ def quantify_distribution_shift(X,Y):
     print(f"FID: {fid.item():.6f}")
     return {"MMD":mmd.item(),"FID":fid.item()}
 
-# -----------------------------
-# 1. Mean shift (L2 distance)
-# -----------------------------
 def embedding_mean_shift(X, Y):
     """
     Measures shift in embedding centroids.
@@ -124,10 +96,6 @@ def embedding_mean_shift(X, Y):
     mu_y = Y.mean(dim=0)
     return torch.norm(mu_x - mu_y, p=2).item()
 
-
-# ---------------------------------------
-# 2. Covariance distance (Frobenius norm)
-# ---------------------------------------
 def covariance_distance(X, Y):
     """
     Compares covariance structure shift.
@@ -141,9 +109,6 @@ def covariance_distance(X, Y):
     return torch.norm(cov_x - cov_y, p='fro').item()
 
 
-# ---------------------------------------
-# 3. MMD (Gaussian kernel)
-# ---------------------------------------
 def pairwise_sq_dists(A, B):
     """
     Squared Euclidean distances.
@@ -187,9 +152,7 @@ def rbf_kernel(A, B, sigmas):
     """
     Multi-scale RBF kernel.
     """
-
     dists = pairwise_sq_dists(A, B)
-
     K = 0
     for sigma in sigmas:
         K += torch.exp(
@@ -200,12 +163,7 @@ def rbf_kernel(A, B, sigmas):
 
 
 @torch.no_grad()
-def mmd_rbf(
-    X,
-    Y,
-    sigmas=None,
-    chunk_size=1024,
-):
+def mmd_rbf(X,Y,sigmas=None,chunk_size=1024,):
     """
     Memory-efficient RBF MMD.
 
@@ -223,13 +181,7 @@ def mmd_rbf(
 
     if sigmas is None:
         sigma = median_bandwidth(X, Y)
-
-        sigmas = [
-            sigma / 2,
-            sigma,
-            sigma * 2,
-        ]
-
+        sigmas = [sigma / 2,sigma,sigma * 2,]
 
     def kernel_mean(A, B):
         """
@@ -237,36 +189,25 @@ def mmd_rbf(
         E[k(A,B)]
         without storing full kernel matrix.
         """
-
         total = 0.0
         count = 0
 
         for i in range(0, A.shape[0], chunk_size):
-
             Ai = A[i:i + chunk_size]
-
             K = rbf_kernel(
                 Ai,
                 B,
                 sigmas
             )
-
             total += K.sum()
             count += K.numel()
-
         return total / count
-
 
     k_xx = kernel_mean(X, X)
     k_yy = kernel_mean(Y, Y)
     k_xy = kernel_mean(X, Y)
-
     return k_xx + k_yy - 2 * k_xy
 
-
-# ---------------------------------------
-# 4. Linear CKA similarity
-# ---------------------------------------
 def cka_linear(X, Y):
     """
     Linear Centered Kernel Alignment.
@@ -286,45 +227,37 @@ def median_sigma(X):
     return torch.median(dists).item()
 
 def convert2PIL():
-    train_ds = FIRSTGalaxyData(root="/home/users/l/lastufka/scratch/FIRSTGalaxyData", selected_split="train", input_data_list=["galaxy_data_h5.h5"], transform=None, is_PIL=True, is_RGB=True)
-    test_ds = FIRSTGalaxyData(root="/home/users/l/lastufka/scratch/FIRSTGalaxyData", selected_split="test", input_data_list=["galaxy_data_h5.h5"], transform=None, is_PIL=True, is_RGB=True)
+    train_ds = FIRSTGalaxyData(root="~/scratch/FIRSTGalaxyData", selected_split="train", input_data_list=["galaxy_data_h5.h5"], transform=None, is_PIL=True, is_RGB=True)
+    test_ds = FIRSTGalaxyData(root="~/scratch/FIRSTGalaxyData", selected_split="test", input_data_list=["galaxy_data_h5.h5"], transform=None, is_PIL=True, is_RGB=True)
     for i in range(len(train_ds)):
         img,label = train_ds[i]
-        img.save(f"/home/users/l/lastufka/scratch/FIRSTGalaxyData/pngs/train{i}_{label}.png")
+        img.save(f"~/scratch/FIRSTGalaxyData/pngs/train{i}_{label}.png")
     for i in range(len(test_ds)):
         img,label = test_ds[i]
-        img.save(f"/home/users/l/lastufka/scratch/FIRSTGalaxyData/pngs/test{i}_{label}.png")
+        img.save(f"~/scratch/FIRSTGalaxyData/pngs/test{i}_{label}.png")
 
 def plot_umap(model, args):
     try:
-        with open('/home/users/l/lastufka/eupe_paper/embeddings.pkl', 'rb') as fp:
+        with open('~/embeddings.pkl', 'rb') as fp:
             embeddings= pickle.load(fp)
     except FileNotFoundError:
         args.dataset_train = "RGZ20k"
         dataset, _,_,_ = get_dataset(args)
-        #fig = plot_dataset_sample(dataset)
-        #fig.savefig("/home/users/l/lastufka/eupe_paper/rgz20k_sample.png",dpi=150)
         train_embeddings,_ = extract_features(model, dataset)
-        args.dataset_train = "/home/users/l/lastufka/scratch/FIRSTGalaxyData/pngs"
+        args.dataset_train = "~/scratch/FIRSTGalaxyData/pngs"
         dataset, _,_,_ = get_dataset(args)
-        #fig = plot_dataset_sample(dataset)
-        #fig.savefig("/home/users/l/lastufka/eupe_paper/first_sample.png",dpi=150)
         first_embeddings,_ = extract_features(model, dataset)
         args.dataset_train = "image_net1k"
         dataset, _,_,_ = get_dataset(args)
-        #fig = plot_dataset_sample(dataset)
-        #fig.savefig("/home/users/l/lastufka/eupe_paper/in1k_sample.png",dpi=150)
         imagenet_embeddings,_ = extract_features(model, dataset, collate_fn = None)
-        args.dataset_train = "/home/users/l/lastufka/scratch/MiraBest"
+        args.dataset_train = "~/scratch/MiraBest"
         args.fake_chan = True
         dataset, _,_,_ = get_dataset(args)
-        #fig = plot_dataset_sample(dataset)
-        #fig.savefig("/home/users/l/lastufka/eupe_paper/mb_sample.png",dpi=150)
         mb_embeddings,_ = extract_features(model, dataset)
-        args.dataset_train = "/home/users/l/lastufka/scratch/rgz/od"
+        args.dataset_train = "~/scratch/rgz/od"
         dataset, _,_,_ = get_dataset(args)
         fig = plot_dataset_sample(dataset)
-        fig.savefig("/home/users/l/lastufka/eupe_paper/rgzod_sample.png",dpi=150)
+        fig.savefig("~/rgzod_sample.png",dpi=150)
         rgz_embeddings,_ = extract_features(model, dataset)
         
         embeddings = {
@@ -335,7 +268,7 @@ def plot_umap(model, args):
             "ImageNet": imagenet_embeddings,
         }
         #print([k,v.shape() for k,v in embeddings])
-        with open('/home/users/l/lastufka/eupe_paper/embeddings.pkl', 'wb') as fp:
+        with open('~/embeddings.pkl', 'wb') as fp:
             pickle.dump(embeddings, fp)
 
     features = []
@@ -407,7 +340,7 @@ def calc_all_metrics(args):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_name', default="nvidia/RADIO-B", type=str,help='')
-    parser.add_argument('--output_dir', default="/home/users/l/lastufka/FM_compare/GMNIST", type=str,help='')
+    parser.add_argument('--output_dir', default="~/GMNIST", type=str,help='')
     parser.add_argument('--project', default="FM_compare", type=str,help='')
     parser.add_argument('--weights', default=None, type=str,help='')
     parser.add_argument('--ims_per_batch', default=8, type=int,help='')
@@ -441,8 +374,8 @@ def get_args():
     parser.add_argument('--rho', default=2.0, type=float,help='')
     parser.add_argument('--use_fp16', dest="use_fp16",action = 'store_true',help='')
     parser.set_defaults(use_fp16=False)
-    parser.add_argument('--dataset_train', default='/home/users/scratch/image_net1k') 
-    parser.add_argument('--dataset2', default='/home/users/l/lastufka/scratch/rgz/od') 
+    parser.add_argument('--dataset_train', default='~/scratch/image_net1k') 
+    parser.add_argument('--dataset2', default='~/scratch/rgz/od') 
     parser.add_argument('--freeze_backbone', default=0, type=int) #action = 'store_true',help='')
     parser.add_argument('--block', default=None, type=str,help='')
     parser.add_argument('--nblocks', default=1, type=int)
@@ -463,7 +396,7 @@ if __name__ == "__main__":
         d0 = pd.DataFrame(dd)
         d1 = pd.DataFrame(ii)
         df = pd.concat([d0,d1])
-        df.to_csv(f"/home/users/l/lastufka/eupe_paper/{args.dataset_train[args.dataset_train.rfind('/'):-4]}_mets.csv")
+        df.to_csv(f"~/{args.dataset_train[args.dataset_train.rfind('/'):-4]}_mets.csv")
         sys.exit()
     backbone = get_model(args, [])
     try:

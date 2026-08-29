@@ -10,19 +10,13 @@ import yaml
 import sys
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-sys.path.append('/home/users/l/lastufka')
-# import from sthalles repo
-#from SimCLR.models.resnet_simclr import ResNetSimCLR  # we will replace backbone
-sys.path.append('/home/users/l/lastufka/PyTorch-BYOL')
+
+sys.path.append('~/PyTorch-BYOL')
 from trainer import BYOLTrainer2
-from feuerzeug.models import print_trainable_parameters
 from feuerzeug.datasets.COCODataset import RGZimageDatasetClassification
 from feuerzeug.datasets.PILDataset import RGZ20k
 from feuerzeug.transforms import FakeChannels
 
-# -----------------------------
-# BYOL augmentations (standard recipe)
-# -----------------------------
 def get_augmentations(image_size=224, fake_3chan = False):
     """
     Based on SimCLR paper:
@@ -45,10 +39,6 @@ def get_augmentations(image_size=224, fake_3chan = False):
     
     return T.Compose(tlist)
 
-
-# -----------------------------
-# Dataset wrapper for SimCLR
-# -----------------------------
 class SimCLRDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, transform):
         self.dataset = dataset
@@ -63,10 +53,6 @@ class SimCLRDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
-
-# -----------------------------
-# ViT backbone wrapper
-# -----------------------------
 def build_vit():
     vit = timm.create_model("vit_tiny_patch16_224", pretrained=False)
     vit.reset_classifier(0)
@@ -82,7 +68,7 @@ def train(args):
         ds = RGZimageDatasetClassification(None, None, train=True)
         #test_ds = RGZimageDatasetClassification(None, None, train=False)
     elif args.dataset == "RGZ20k":
-        ds = RGZ20k(root = "/home/users/l/lastufka/scratch/rgz", train=True) 
+        ds = RGZ20k(root = "~/rgz", train=True) 
         #test_ds = RGZimageDatasetClassification(None, None, train=False)
     train_dataset = SimCLRDataset(ds, get_augmentations(args.image_size, args.fake_chan))
 
@@ -130,9 +116,6 @@ def train(args):
 
     trainer.train(train_dataset)
 
-# -----------------------------
-# CLI
-# -----------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 

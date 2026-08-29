@@ -13,7 +13,7 @@ import numpy as np
 from ultralytics import YOLO
 import sys
 import os
-sys.path.append("/home/users/l/lastufka")
+
 from feuerzeug.datasets.COCODataset import RGZimageDatasetClassification
 from feuerzeug.datasets.PILDataset import RGZ20k
 from feuerzeug.datasets.NumPyDataset import Galaxy10Dataset
@@ -103,7 +103,7 @@ class ViTEncoder(nn.Module):
             model_size = model_name[-1].lower()
             
             self.backbone = torch.hub.load(
-            "/home/users/l/lastufka/EUPE",f"eupe_vit{model_size}16",source='local',weights=f"/home/users/l/lastufka/EUPE/EUPE-ViT-{model_size.upper()}.pt")
+            "~/EUPE",f"eupe_vit{model_size}16",source='local',weights=f"~/EUPE/EUPE-ViT-{model_size.upper()}.pt")
             self.embed_dim = fdict[model_size]
         elif "dino" in model_name:
             model_size = model_name[8] #e.g. "dino_vits16"
@@ -127,95 +127,6 @@ class ViTEncoder(nn.Module):
         N, V = x.shape[:2]
         emb = self.backbone(x.flatten(0, 1))
         return emb, self.proj(emb).reshape(N, V, -1).transpose(0, 1)
-
-class YOLOEncoder(nn.Module):
-    def __init__(
-        self,
-        model_name="yolov8n.pt",
-        proj_dim=128,
-        mlp_dim=1024,
-        imsize=224,
-        use_spatial=False,
-        C=1024
-    ):
-        super().__init__()
-
-        yolo = YOLO(model_name)
-        print_trainable_parameters(yolo)
-        for p in yolo.model.parameters():
-            p.requires_grad = True
-        
-        self.backbone = yolo.model #.to("cuda")
-        self.backbone.model.training = True
-        self.backbone.model[-1].training = False
-        print_trainable_parameters(self.backbone)
-        # backbone only
-        
-        self.use_spatial = use_spatial
-        # self.feat = None
-
-        def hook_fn(module, inp, out):
-            self.feat = out #.detach()
-            # print(type(self.feat))
-            # print(self.feat.requires_grad)
-            # print(self.feat.is_leaf)
-            # print(self.feat.grad_fn)
-
-        # register hook on last backbone block dynamically
-        backbone_blocks = list(self.backbone.model.children())
-        target = backbone_blocks[-3]   # typically last C2f before neck
-        
-        target.register_forward_hook(hook_fn)
-
-        # with torch.no_grad():
-        #     dummy = torch.zeros(1, 3, imsize, imsize).to("cuda")
-        #     _ = self.backbone(dummy)
-        
-        # feat = self.feat
-        # if isinstance(feat, (list, tuple)):
-        #     feat = feat[-1]
-        
-        C = 384 #feat.shape[1]   # <-- THIS is correct YOLO channel dim
-        self.embed_dim = C
-
-        self.proj = MLP(C,[mlp_dim, mlp_dim, proj_dim],norm_layer=None) #nn.BatchNorm1d,)
-
-    def forward(self, x):
-        #print("grad enabled:", torch.is_grad_enabled())
-        #print("autocast:", torch.is_autocast_enabled())
-        N, V = x.shape[:2]
-        x = x.flatten(0, 1)
-
-        self.feat = None
-        with torch.enable_grad():
-            _ = self.backbone(x)   # full forward pass
-
-        feat = self.feat 
-
-        # run full backbone+neck, but stop BEFORE Detect head
-        #y = self.backbone.forward(x)  # IMPORTANT: NOT self.model(x)
-        #print("y requires_grad:", y.requires_grad if torch.is_tensor(y) else None)
-        # YOLO returns tuple/list of feature maps in training path
-        # if isinstance(y, (list, tuple)):
-        #     feat = y[-1]   # highest-level feature map (P5)
-    
-        # elif isinstance(y, dict):
-        #     feat = y.get("feat", None) or y.get("feats", None)
-        #     if isinstance(feat, (list, tuple)):
-        #         feat = feat[-1]
-        #     if feat is None:
-        #         feat = list(y.values())[-1]
-    
-        # else:
-        #     feat = y
-    
-        # assert hasattr(feat, "shape"), f"Bad feat type: {type(feat)}"
-        # print("feat grad fn:", feat.grad_fn)
-        # print("feat requires_grad:", feat.requires_grad)
-        emb = F.adaptive_avg_pool2d(feat, 1).flatten(1)
-        proj = self.proj(emb).reshape(N, V, -1).transpose(0, 1)
-    
-        return emb, proj
 
 class HFDataset(torch.utils.data.Dataset):
     def __init__(self, ds, split, V=1, V_local=2, imsize=224, local_imsize=98):
@@ -288,8 +199,6 @@ class HFDataset(torch.utils.data.Dataset):
             views = torch.cat([global_views, local_views], dim=0)
         else:
             views = global_views
-
-        # concatenate on V dimension
         
         return views, label
 
@@ -352,22 +261,22 @@ def main(cfg: DictConfig):
         test_ds = RGZimageDatasetClassification(None, None, train=False, transform = eval_transform)
         do_probe = True
     elif cfg.dataset == "RGZ20k":
-        ds = RGZ20k(root = "/home/users/l/lastufka/scratch/rgz", train=True) 
+        ds = RGZ20k(root = "~/scratch/rgz", train=True) 
         test_ds = RGZimageDatasetClassification(None, None, train=False, transform = eval_transform)
     elif cfg.dataset == "MGCLS":
-        ds = MeerKATDataset('/home/users/l/lastufka/scratch/MGCLS_data/enhanced/crops_224_3chan_rescale', fake_3chan = False)
+        ds = MeerKATDataset('~/scratch/MGCLS_data/enhanced/crops_224_3chan_rescale', fake_3chan = False)
         test_ds = RGZimageDatasetClassification(None, None, train=False, transform = eval_transform)
     elif cfg.dataset == "GZ10":
-        ds = Galaxy10Dataset('/home/users/l/lastufka/scratch/Galaxy10DECals', train = True)
-        test_ds = Galaxy10Dataset('/home/users/l/lastufka/scratch/Galaxy10DECals', train = False, transform = eval_transform)
+        ds = Galaxy10Dataset('~/scratch/Galaxy10DECals', train = True)
+        test_ds = Galaxy10Dataset('~/scratch/Galaxy10DECals', train = False, transform = eval_transform)
         do_probe = True
     elif cfg.dataset == "GMNIST":
-        ds = GalaxyMNIST(root='/home/users/l/lastufka/scratch/GalaxyMNIST', download = False, train=True)
-        test_ds = GalaxyMNIST(root='/home/users/l/lastufka/scratch/GalaxyMNIST', download = False, train=False, transform = eval_transform)
+        ds = GalaxyMNIST(root='~/scratch/GalaxyMNIST', download = False, train=True)
+        test_ds = GalaxyMNIST(root='~/scratch/GalaxyMNIST', download = False, train=False, transform = eval_transform)
         do_probe = True
     elif cfg.dataset == "GZ2":
         ds = load_dataset('mwalmsley/gz2', split='train') 
-        test_ds = GalaxyMNIST(root='/home/users/l/lastufka/scratch/GalaxyMNIST', download = False, train=False, transform = eval_transform) #load_dataset('mwalmsley/gz2', split='train') 
+        test_ds = GalaxyMNIST(root='~/scratch/GalaxyMNIST', download = False, train=False, transform = eval_transform) #load_dataset('mwalmsley/gz2', split='train') 
     full_ds = HFDataset(ds, "train", V=cfg.V, V_local=cfg.V_local, imsize=cfg.imsize)
 
     n_val = int(0.2 * len(full_ds))
@@ -391,12 +300,12 @@ def main(cfg: DictConfig):
         mname = cfg.model
     else:
         mname = cfg.checkpoint
-    if "yolo" in mname:
-        net = YOLOEncoder(mname,proj_dim=cfg.proj_dim,mlp_dim=cfg.mlp_dim,use_spatial=cfg.yolo_spatial,).to("cuda")
-    elif "efficient" in mname:
+    # if "yolo" in mname:
+    #     net = YOLOEncoder(mname,proj_dim=cfg.proj_dim,mlp_dim=cfg.mlp_dim,use_spatial=cfg.yolo_spatial,).to("cuda")
+    if "efficient" in mname:
         net = EfficientNetEncoder(mname, proj_dim = cfg.proj_dim, mlp_dim = cfg.mlp_dim, pretrained=True).to("cuda")
-    elif "convnext" in mname:
-        net = EfficientNetEncoder(mname, proj_dim = cfg.proj_dim, mlp_dim = cfg.mlp_dim, pretrained=False).to("cuda")
+    # elif "convnext" in mname:
+    #     net = EfficientNetEncoder(mname, proj_dim = cfg.proj_dim, mlp_dim = cfg.mlp_dim, pretrained=False).to("cuda")
     else:
         net = ViTEncoder(mname, proj_dim=cfg.proj_dim, imsize=cfg.imsize).to("cuda")
     # if cfg.checkpoint is not None:
