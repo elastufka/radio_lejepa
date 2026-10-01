@@ -15,12 +15,12 @@ import numpy as np
 import sys
 import os
 import argparse
-sys.path.append("/home/users/l/lastufka")
+#sys.path.append("/home/users/l/lastufka")
 #from feuerzeug.datasets.COCODataset import RGZimageDatasetClassification
 #from feuerzeug.datasets.PILDataset import RGZ20k
 from feuerzeug.datasets.NumPyDataset import Galaxy10Dataset
 #from feuerzeug.datasets.MeerKATDataset import MeerKATDataset
-from feuerzeug.models import ViTForLeJEPAProbe
+#from feuerzeug.models import ViTForLeJEPAProbe
 from feuerzeug.transforms import CVStandardTransforms, CVEvalTransforms
 #from galaxy_mnist.galaxy_mnist import GalaxyMNIST
 from feuerzeug.hf_utils import *
@@ -77,6 +77,45 @@ def compute_metrics(eval_pred):
 #         "pixel_values": torch.stack(images),
 #         "labels": torch.tensor(labels)
 #     }
+
+class ViTForLeJEPAProbe(nn.Module):
+    def __init__(self, backbone_model, num_classes):
+        super().__init__()
+
+        self.backbone = backbone_model
+        self.embed_dim = self.backbone.embed_dim
+        self.norm = nn.LayerNorm(self.embed_dim * 2)
+        self.head = nn.Linear(self.embed_dim * 2, num_classes)
+
+    def forward(self, pixel_values, labels=None):
+
+        x = self.backbone.patch_embed(pixel_values)
+
+        cls = self.backbone.cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls, x), dim=1)
+
+        x = x + self.backbone.pos_embed
+        x = self.backbone.pos_drop(x)
+
+        cls_tokens = []
+
+        for blk in self.backbone.blocks:
+            x = blk(x)
+            cls_tokens.append(x[:, 0])
+
+        x = self.backbone.norm(x)
+
+        # last 2 CLS tokens
+        feat = torch.cat([cls_tokens[-2], cls_tokens[-1]], dim=-1)
+
+        feat = self.norm(feat)
+        logits = self.head(feat)
+
+        loss = None
+        if labels is not None:
+            loss = F.cross_entropy(logits, labels)
+
+        return {"loss": loss, "logits": logits}
 
 def main(args):
     # train_ds = Galaxy10Dataset('/home/users/l/lastufka/scratch/Galaxy10DECals', train = True, transform = CVStandardTransforms(), return_dict = True)
